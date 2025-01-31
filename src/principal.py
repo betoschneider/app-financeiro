@@ -4,6 +4,7 @@ import sys
 import streamlit as st
 import sqlite3
 from datetime import datetime
+import pandas as pd
 
 # Adiciona o diretório raiz ao path do Python
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -69,19 +70,26 @@ def main():
     # Área principal - Matriz de transações
     transactions = transaction_repo.get_all()
     items_dict = {item.id: item for item in item_repo.get_all()}
-    def formatar_data(data):
-        try:
-            return datetime.strptime(data, "%Y-%m-%d").strftime("%d/%m/%Y")
-        except ValueError:
-            return datetime.strptime(data, "%Y-%m-%d %H:%M:%S.%f").strftime("%d/%m/%Y")
-
     
     if transactions:
+        # Criar opções para o selectbox
+        transaction_year = {
+            f"{datetime.strftime(t.date, '%Y')} ": t 
+            for t in transactions
+        }
+        
+        selected_transaction_year = st.selectbox(
+            "Selecione ano",
+            options=list(transaction_year.keys())
+        )
+        
         data = []
         for t in transactions:
             item = items_dict.get(t.item_id)
             data.append({
-                "Data": formatar_data(t.date),
+                "Ano": t.date.strftime("%Y"),
+                "Ref": t.date.strftime("%m"),
+                "Data": t.date.strftime("%d/%m/%Y"),
                 "Item": item.name if item else "N/A",
                 "Categoria": item.category if item else "N/A",
                 "Valor": f"R$ {t.value:.2f}",
@@ -89,7 +97,40 @@ def main():
                 "Status": "Efetivado" if t.is_completed else "Pendente",
                 "Recorrente": "Sim" if t.is_recurring else "Não"
             })
-        
+
+        # Tratamento do histórico de transações
+        data = pd.DataFrame(data)
+        data["Ano"] = data["Ano"].astype(int)
+        data["Ref"] = data["Ref"].astype(int)
+        # Seleciona o ano desejado
+        data = data[data["Ano"] == int(selected_transaction_year)] 
+        data = data.drop("Ano", axis=1)
+        # Busca o último mês com transação
+        max_mes = data["Ref"].max()
+        # DF temporário com as transações recorrentes do último mês
+        transacoes_recorrentes = data[(data["Ref"] == max_mes) & (data["Recorrente"] == "Sim")]
+        # Adiciona as transações recorrentes para os meses seguintes
+        for i in range(12 - max_mes):
+            transacoes_recorrentes["Ref"] = i + max_mes + 1
+            data = pd.concat([data, transacoes_recorrentes], ignore_index=True)
+        # Pivotando a tabela: linhas itens, colunas mês
+        data = pd.pivot_table(
+            data,
+            values="Valor",
+            index="Item",
+            columns="Ref",
+            aggfunc='sum'
+        ).reset_index()
+        # Ajustando nome dos meses
+        colunas = data.columns
+        meses = [
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+        ]
+        novas_colunas = [colunas[0]] + [meses[int(num) - 1] for num in colunas[1:]]
+        data.columns = novas_colunas
+
+        # Exibindo as informações na tabela
         st.dataframe(
             data,
             use_container_width=True,

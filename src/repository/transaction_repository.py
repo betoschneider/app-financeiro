@@ -2,6 +2,7 @@
 import os
 import sys
 from typing import List
+from datetime import datetime
 
 # Adiciona o diretório raiz ao path do Python
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -14,12 +15,14 @@ from src.models.transaction import Transaction
 class TransactionRepository(BaseRepository[Transaction]):
     def add(self, transaction: Transaction) -> Transaction:
         cursor = self.conn.cursor()
+        date_str = transaction.date.strftime("%Y-%m-%d") if isinstance(transaction.date, datetime) else transaction.date
+        
         cursor.execute(
             """INSERT INTO transactions 
                (item_id, value, type, is_completed, is_recurring, date) 
                VALUES (?, ?, ?, ?, ?, ?)""",
             (transaction.item_id, transaction.value, transaction.type,
-             transaction.is_completed, transaction.is_recurring, transaction.date)
+             transaction.is_completed, transaction.is_recurring, date_str)
         )
         self.conn.commit()
         transaction.id = cursor.lastrowid
@@ -31,7 +34,18 @@ class TransactionRepository(BaseRepository[Transaction]):
             SELECT id, item_id, value, type, is_completed, is_recurring, date 
             FROM transactions
         """)
-        return [Transaction(*row) for row in cursor.fetchall()]
+        return [
+            Transaction(
+                id=row[0],
+                item_id=row[1],
+                value=row[2],
+                type=row[3],
+                is_completed=bool(row[4]),
+                is_recurring=bool(row[5]),
+                date=Transaction.format_date(row[6])
+            )
+            for row in cursor.fetchall()
+        ]
     
     def get_by_id(self, id: int) -> Transaction:
         cursor = self.conn.cursor()
@@ -40,10 +54,22 @@ class TransactionRepository(BaseRepository[Transaction]):
             FROM transactions WHERE id = ?
         """, (id,))
         row = cursor.fetchone()
-        return Transaction(*row) if row else None
+        if row:
+            return Transaction(
+                id=row[0],
+                item_id=row[1],
+                value=row[2],
+                type=row[3],
+                is_completed=bool(row[4]),
+                is_recurring=bool(row[5]),
+                date=Transaction.format_date(row[6])
+            )
+        return None
     
     def update(self, transaction: Transaction) -> Transaction:
         cursor = self.conn.cursor()
+        date_str = transaction.date.strftime("%Y-%m-%d") if isinstance(transaction.date, datetime) else transaction.date
+        
         cursor.execute(
             """UPDATE transactions 
                SET item_id = ?, value = ?, type = ?, is_completed = ?, 
@@ -51,11 +77,11 @@ class TransactionRepository(BaseRepository[Transaction]):
                WHERE id = ?""",
             (transaction.item_id, transaction.value, transaction.type,
              transaction.is_completed, transaction.is_recurring, 
-             transaction.date, transaction.id)
+             date_str, transaction.id)
         )
         self.conn.commit()
         return transaction
-    
+
     def delete(self, id: int) -> bool:
         cursor = self.conn.cursor()
         cursor.execute("DELETE FROM transactions WHERE id = ?", (id,))
