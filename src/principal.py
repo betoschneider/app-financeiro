@@ -98,6 +98,7 @@ def main():
                 "Status": "Efetivado" if t.is_completed else "Pendente",
                 "Recorrente": "Sim" if t.is_recurring else "Não"
             })
+
         # Definindo as datas atuais
         data_atual = datetime.now()
         mes_atual = data_atual.month
@@ -186,6 +187,20 @@ def main():
         # Formatação dos valores para exibição
         for num in colunas[1:]:
             df_exibicao[meses[int(num) - 1]] = df_exibicao[meses[int(num) - 1]].apply(lambda x: f"{x:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.') if pd.notna(x) else "")
+        
+        # Adiciona as colunas de categoria aos itens
+        df_item = data[["Item", "Categoria", "Tipo"]]
+        df_item = df_item.drop_duplicates()
+        df_exibicao = df_exibicao.merge(df_item, on="Item", how="left")
+
+        # Classifica o dataframe: Créditos primeiro
+        df_exibicao.sort_values(by=["Tipo", "Categoria", "Item"], inplace=True)
+
+        # Reorganiza as colunas
+        colunas = df_exibicao.columns.tolist()
+        nova_ordem = ['Item', 'Categoria', 'Tipo'] + [col for col in colunas if col not in ['Item', 'Categoria', 'Tipo']]
+        df_exibicao = df_exibicao.reindex(columns=nova_ordem)
+        df_exibicao.drop(columns=["Tipo"], inplace=True)
 
         # Exibindo as informações na tabela
         st.dataframe(
