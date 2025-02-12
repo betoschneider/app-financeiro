@@ -184,10 +184,25 @@ def main():
         novas_colunas = [colunas[0]] + [meses[int(num) - 1] for num in colunas[1:]]
         df_exibicao.columns = novas_colunas
 
-        # Formatação dos valores para exibição
+        # Antes de formatar os valores para exibição, vamos criar uma função de estilo
+        def style_valor(valor):
+            try:
+                # Remove R$ e converte para float
+                num = float(valor.replace('R$ ', '').replace('.', '').replace(',', '.'))
+                if num < 0:
+                    return 'color: red; text-align: center'
+                elif num > 0:
+                    return 'color: blue; text-align: center'
+                return 'text-align: center'  # para valores zero ou vazios
+            except:
+                return 'text-align: center'  # para casos de erro
+
+        # Na parte onde você formata o dataframe para exibição
         for num in colunas[1:]:
-            df_exibicao[meses[int(num) - 1]] = df_exibicao[meses[int(num) - 1]].apply(lambda x: f"{x:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.') if pd.notna(x) else "")
-        
+            df_exibicao[meses[int(num) - 1]] = df_exibicao[meses[int(num) - 1]].apply(
+                lambda x: f"R$ {x:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.') if pd.notna(x) else ""
+            )
+
         # Adiciona as colunas de categoria aos itens
         df_item = data[["Item", "Categoria", "Tipo"]]
         df_item = df_item.drop_duplicates()
@@ -201,6 +216,12 @@ def main():
         nova_ordem = ['Item', 'Categoria', 'Tipo'] + [col for col in colunas if col not in ['Item', 'Categoria', 'Tipo']]
         df_exibicao = df_exibicao.reindex(columns=nova_ordem)
         df_exibicao.drop(columns=["Tipo"], inplace=True)
+
+        # Aplicando o estilo ao dataframe
+        df_exibicao = df_exibicao.style.apply(
+            lambda x: [style_valor(v) if isinstance(v, str) and 'R$' in v else 'text-align: center' for v in x],
+            axis=1
+        )
 
         # Exibindo as informações na tabela
         st.dataframe(
