@@ -30,31 +30,46 @@ def main():
     st.title("Controle Financeiro")
     
     # Sidebar para formulários
+    # ... existing code ...
+
     with st.sidebar:
         st.header("Nova Transação")
         with st.form("transaction_form"):
             items = item_repo.get_all()
             item_options = {f"{item.name} ({item.category})": item.id for item in items}
             
-            selected_item = st.selectbox("Item", options=list(item_options.keys()))
-            value = st.number_input("Valor", min_value=0.00, step=0.01)
-            date = st.date_input("Data", value="today", min_value=None, max_value=None, key=None, help=None, on_change=None, format="DD/MM/YYYY", disabled=False, label_visibility="visible")
+            # Adiciona opção vazia no início
+            item_options = {"": None, **item_options}
+            
+            selected_item = st.selectbox(
+                "Item", 
+                options=list(item_options.keys()),
+                index=0  # Seleciona o primeiro item (vazio)
+            )
+            
+            value = st.number_input("Valor", min_value=0.00, step=1.00)
+            date = st.date_input("Data", value="today", format="DD/MM/YYYY")
             trans_type = st.selectbox("Tipo", options=["Débito", "Crédito"])
-            is_completed = st.checkbox("Efetivado")
+            is_completed = st.checkbox("Efetivado", value=True)  # Marcado por padrão
             is_recurring = st.checkbox("Recorrente")
             submit_trans = st.form_submit_button("Registrar Transação")
             
-            if submit_trans and selected_item and value:
-                transaction = Transaction(
-                    item_id=item_options[selected_item],
-                    value=value,
-                    type="D" if trans_type == "Débito" else "C",
-                    is_completed=is_completed,
-                    is_recurring=is_recurring,
-                    date=date
-                )
-                transaction_repo.add(transaction)
-                st.success("Transação registrada com sucesso!")
+            if submit_trans:
+                if not selected_item:  # Verifica se um item foi selecionado
+                    st.error("Por favor, selecione um item.")
+                elif value <= 0:  # Opcional: verificar se o valor é maior que zero
+                    st.error("Por favor, insira um valor maior que zero.")
+                else:
+                    transaction = Transaction(
+                        item_id=item_options[selected_item],
+                        value=value,
+                        type="D" if trans_type == "Débito" else "C",
+                        is_completed=is_completed,
+                        is_recurring=is_recurring,
+                        date=date
+                    )
+                    transaction_repo.add(transaction)
+                    st.success("Transação registrada com sucesso!")
     
         st.header("Cadastro de Item")
         with st.form("item_form"):
@@ -184,7 +199,7 @@ def main():
         novas_colunas = [colunas[0]] + [meses[int(num) - 1] for num in colunas[1:]]
         df_exibicao.columns = novas_colunas
 
-        # Antes de formatar os valores para exibição, vamos criar uma função de estilo
+        #função de estilo
         def style_valor(valor):
             try:
                 # Remove R$ e converte para float
@@ -197,7 +212,7 @@ def main():
             except:
                 return 'text-align: center'  # para casos de erro
 
-        # Na parte onde você formata o dataframe para exibição
+        # formata o dataframe para exibição
         for num in colunas[1:]:
             df_exibicao[meses[int(num) - 1]] = df_exibicao[meses[int(num) - 1]].apply(
                 lambda x: f"R$ {x:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.') if pd.notna(x) else ""
