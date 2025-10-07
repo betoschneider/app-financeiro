@@ -215,7 +215,8 @@ def main():
         # formata o dataframe para exibição
         for num in colunas[1:]:
             df_exibicao[meses[int(num) - 1]] = df_exibicao[meses[int(num) - 1]].apply(
-                lambda x: f"R$ {x:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.') if pd.notna(x) else ""
+                # lambda x: f"R$ {x:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.') if pd.notna(x) else ""
+                lambda x: f"{x:,.2f}".replace(',', '_').replace('.', ',').replace('_', '.') if pd.notna(x) else ""
             )
 
         # Adiciona as colunas de categoria aos itens
@@ -234,16 +235,18 @@ def main():
 
         # Aplicando o estilo ao dataframe
         df_exibicao = df_exibicao.style.apply(
-            lambda x: [style_valor(v) if isinstance(v, str) and 'R$' in v else 'text-align: center' for v in x],
+            # lambda x: [style_valor(v) if isinstance(v, str) and 'R$' in v else 'text-align: center' for v in x],
+            lambda x: [style_valor(v) if isinstance(v, str) else 'text-align: center' for v in x],
             axis=1
         )
 
-        # Exibindo as informações na tabela
-        st.dataframe(
+        # Exibindo o dataframe com data_editor
+        st.data_editor(
             df_exibicao,
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
         )
+
     else:
         st.info("Nenhuma transação registrada ainda.")
 
