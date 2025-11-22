@@ -87,3 +87,31 @@ class TransactionRepository(BaseRepository[Transaction]):
         cursor.execute("DELETE FROM transactions WHERE id = ?", (id,))
         self.conn.commit()
         return cursor.rowcount > 0
+
+    def get_by_item_month_year(self, item_id: int, month: int, year: int) -> List[Transaction]:
+        cursor = self.conn.cursor()
+        # SQLite strftime returns string, so we compare with string formatted month/year
+        # %m is 01-12, %Y is YYYY
+        month_str = f"{month:02d}"
+        year_str = str(year)
+        
+        cursor.execute("""
+            SELECT id, item_id, value, type, is_completed, is_recurring, date 
+            FROM transactions 
+            WHERE item_id = ? 
+            AND strftime('%m', date) = ? 
+            AND strftime('%Y', date) = ?
+        """, (item_id, month_str, year_str))
+        
+        return [
+            Transaction(
+                id=row[0],
+                item_id=row[1],
+                value=row[2],
+                type=row[3],
+                is_completed=bool(row[4]),
+                is_recurring=bool(row[5]),
+                date=Transaction.format_date(row[6])
+            )
+            for row in cursor.fetchall()
+        ]

@@ -6,7 +6,7 @@ def get_connection():
     db_path = os.getenv("DATABASE_URL", "data/financial.db")
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
     
     # Criar tabelas se não existirem
     with open("src/database/schema.sql") as f:

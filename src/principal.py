@@ -26,6 +26,94 @@ conn = get_connection()
 item_repo = ItemRepository(conn)
 transaction_repo = TransactionRepository(conn)
 
+def update_database():
+    if "data_editor" not in st.session_state:
+        return
+
+    edited_rows = st.session_state["data_editor"]["edited_rows"]
+    if not edited_rows:
+        return
+
+    current_df = st.session_state.get("current_df")
+    if current_df is None:
+        return
+        
+    selected_year_str = st.session_state.get("selected_year")
+    if not selected_year_str:
+        return
+    year = int(selected_year_str.strip())
+
+    items = item_repo.get_all()
+    
+    meses = [
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+    ]
+
+    for idx, changes in edited_rows.items():
+        try:
+            row = current_df.iloc[int(idx)]
+        except:
+            continue
+            
+        item_name = row["Item"]
+        category = row["Categoria"]
+        
+        # Find item
+        item_id = next((i.id for i in items if i.name == item_name and i.category == category), None)
+        if not item_id:
+            continue
+
+        for col_name, new_value in changes.items():
+            if col_name not in meses:
+                continue
+                
+            month_idx = meses.index(col_name) + 1
+            
+            # Parse value
+            try:
+                if isinstance(new_value, str):
+                    clean_val = new_value.replace('R$', '').strip()
+                    if ',' in clean_val and '.' in clean_val:
+                         clean_val = clean_val.replace('.', '').replace(',', '.')
+                    elif ',' in clean_val:
+                         clean_val = clean_val.replace(',', '.')
+                    val = float(clean_val)
+                else:
+                    val = float(new_value)
+            except ValueError:
+                st.warning(f"Valor inválido inserido para {col_name}")
+                continue
+
+            # Get existing transactions
+            transactions = transaction_repo.get_by_item_month_year(item_id, month_idx, year)
+            
+            if len(transactions) > 1:
+                st.warning(f"Não é possível editar: existem múltiplas transações para {item_name} em {col_name}.")
+                continue
+            
+            if len(transactions) == 1:
+                t = transactions[0]
+                if val < 0:
+                    t.type = 'D'
+                    t.value = abs(val)
+                else:
+                    t.type = 'C'
+                    t.value = val
+                transaction_repo.update(t)
+                st.toast(f"Transação atualizada: {item_name} - {col_name}")
+            else:
+                t = Transaction(
+                    item_id=item_id,
+                    value=abs(val),
+                    type='D' if val < 0 else 'C',
+                    is_completed=True,
+                    is_recurring=False,
+                    date=datetime(year, month_idx, 1)
+                )
+                transaction_repo.add(t)
+                st.toast(f"Nova transação criada: {item_name} - {col_name}")
+
 def main():
     st.title("Controle Financeiro")
     
@@ -96,7 +184,8 @@ def main():
         
         selected_transaction_year = st.selectbox(
             "Selecione ano",
-            options=list(transaction_year.keys())
+            options=list(transaction_year.keys()),
+            key="selected_year"
         )
         
         data = []
@@ -240,11 +329,16 @@ def main():
             axis=1
         )
 
+        # Salva o dataframe atual na sessão para uso no callback
+        st.session_state['current_df'] = df_exibicao
+
         # Exibindo o dataframe com data_editor
         st.data_editor(
             df_exibicao,
             use_container_width=True,
             hide_index=True,
+            key="data_editor",
+            on_change=update_database
         )
 
     else:

@@ -4,7 +4,7 @@ financial_control/
 ├── requirements.txt
 ├── src/
 │   ├── __init__.py
-│   ├── main.py
+│   ├── principal.py
 │   ├── database/
 │   │   ├── __init__.py
 │   │   ├── connection.py
@@ -20,4 +20,4 @@ financial_control/
 │   │   └── transaction.py
 │   └── pages/
 │       ├── __init__.py
-│       └── home.py
+│       └── manutencao.py
